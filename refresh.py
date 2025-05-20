@@ -49,6 +49,7 @@ SEASON_PTS = TRAIN_LOGS.groupby("PLAYER_NAME").PTS.mean()
 BASE = "https://api.the-odds-api.com/v4/sports/basketball_nba"
 
 def today_events():
+    """Return today's NBA events from the Odds API as raw JSON."""
     r = requests.get(f"{BASE}/events",
                      params={"apiKey": ODDS_KEY, "dateFormat": "iso"},
                      timeout=20)
@@ -56,6 +57,20 @@ def today_events():
     return r.json()
 
 def player_points(event_id, game_label):
+    """Return player point props for a game.
+
+    Parameters
+    ----------
+    event_id: str
+        Odds API event identifier.
+    game_label: str
+        Human readable game label.
+
+    Returns
+    -------
+    list[dict]
+        Each entry has ``player``, ``line``, ``price`` and ``game`` keys.
+    """
     r = requests.get(f"{BASE}/events/{event_id}/odds",
                      params={"apiKey": ODDS_KEY,
                              "regions": "us",
@@ -79,6 +94,7 @@ def player_points(event_id, game_label):
     return rows
 
 def fetch_live_props():
+    """Collect player point props for all of today's games as a DataFrame."""
     props = []
     for g in today_events():
         label = f'{g["away_team"]} @ {g["home_team"]}'
