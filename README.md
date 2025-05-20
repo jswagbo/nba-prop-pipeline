@@ -28,6 +28,8 @@
 
 Execute:
 ```bash
-python refresh.py
+python refresh.py [--top N] [--save PATH]
 ```
 The script prints a table of the top edges and a JSON block with the same data.
+Use `--top` to change how many rows are displayed (default 10). If `--save` is
+provided, the JSON output is also written to the given path.

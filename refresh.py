@@ -1,6 +1,6 @@
 # refresh.py  •  loads trained BayesianRidge model
 """
-Run:      python refresh.py
+Run:      python refresh.py [--top N] [--save PATH]
 Requires: ODDS_API_KEY in .env
           models/player_points.joblib   (trained earlier)
 Output:   Top 10 player-points edges (table + JSON)
@@ -8,6 +8,7 @@ Output:   Top 10 player-points edges (table + JSON)
 
 import os, joblib, requests, pandas as pd
 import re
+import argparse
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
@@ -134,7 +135,7 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop(columns=["clean_player", "rolling5_pts"])
 
 # ── Main ─────────────────────────────────────────────────────────────
-def main():
+def main(top_n: int = 10, save_path: str | None = None):
     df = fetch_live_props()
     df = add_features(df)
 
@@ -145,20 +146,31 @@ def main():
 
     df = df.drop_duplicates(subset=["player", "line", "game"])
 
-    top = df.sort_values("edge", ascending=False).head(10)
+    top = df.sort_values("edge", ascending=False).head(top_n)
 
     # markdown
     print(top[["player","game","prop","μ","edge","conf"]]
           .to_markdown(index=False, floatfmt=".1f"))
 
     # JSON
+    json_blob = top.to_json(orient="records", indent=2)
     print("\n```json")
-    print(top.to_json(orient="records", indent=2))
+    print(json_blob)
     print("```")
+
+    if save_path:
+        with open(save_path, "w", encoding="utf-8") as fh:
+            fh.write(json_blob)
+            fh.write("\n")
 
     ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
     print(f"\nData refreshed: {ts} UTC")
     print("\nPredictions are for informational purposes only. Bet responsibly.")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Score NBA player props")
+    parser.add_argument("--top", type=int, default=10, help="number of rows to display")
+    parser.add_argument("--save", type=str, default=None, help="path to write JSON output")
+    args = parser.parse_args()
+
+    main(top_n=args.top, save_path=args.save)
