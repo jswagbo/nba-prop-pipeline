@@ -10,8 +10,16 @@ import os, joblib, requests, pandas as pd
 import re
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-TRAIN_LOGS = pd.read_parquet("data/player_logs.parquet")
-LAST5      = pd.read_parquet("cache/last5.parquet")
+
+try:
+    TRAIN_LOGS = pd.read_parquet("data/player_logs.parquet")
+except FileNotFoundError as e:
+    raise SystemExit("❌  data/player_logs.parquet missing; ensure the training data exists.") from e
+
+try:
+    LAST5 = pd.read_parquet("cache/last5.parquet")
+except FileNotFoundError as e:
+    raise SystemExit("❌  cache/last5.parquet missing; generate the rolling-5 averages first.") from e
 
 def clean_name(name: str) -> str:
     """
