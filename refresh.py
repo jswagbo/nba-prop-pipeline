@@ -40,7 +40,7 @@ ODDS_KEY = os.getenv("ODDS_API_KEY")
 if not ODDS_KEY:
     raise SystemExit("❌  ODDS_API_KEY missing; add it to .env")
 
-MODEL_BUNDLE = joblib.load("models/pts.joblib")
+MODEL_BUNDLE = joblib.load("models/player_points.joblib")
 MODEL        = MODEL_BUNDLE["model"]
 FEATS        = MODEL_BUNDLE["features"]      # ['season_pts','rolling5','home']
 
