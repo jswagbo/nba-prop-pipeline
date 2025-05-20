@@ -6,8 +6,9 @@ Requires: ODDS_API_KEY in .env
 Output:   Top 10 player-points edges (table + JSON)
 """
 
-import os, joblib, requests, pandas as pd
+import os, json, joblib, requests, pandas as pd
 import re
+import argparse
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
@@ -93,14 +94,40 @@ def player_points(event_id, game_label):
         break
     return rows
 
-def fetch_live_props():
+CACHE_FILE = "cache/live_props.json"
+
+def load_cache() -> dict:
+    """Return JSON dict from CACHE_FILE if it exists, else empty dict."""
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE) as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+def save_cache(data: dict) -> None:
+    """Persist ``data`` to CACHE_FILE, creating the directory if needed."""
+    os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
+    with open(CACHE_FILE, "w") as f:
+        json.dump(data, f)
+
+def fetch_live_props(refresh: bool = False) -> pd.DataFrame:
     """Collect player point props for all of today's games as a DataFrame."""
+    today_key = datetime.now(timezone.utc).date().isoformat()
+    cache = load_cache()
+    if not refresh and today_key in cache:
+        return pd.DataFrame(cache[today_key])
+
     props = []
     for g in today_events():
         label = f'{g["away_team"]} @ {g["home_team"]}'
         props += player_points(g["id"], label)
     if not props:
         raise SystemExit("No player-points markets for today.")
+
+    cache[today_key] = props
+    save_cache(cache)
     return pd.DataFrame(props)
 
 # ── Build live feature frame ─────────────────────────────────────────
@@ -135,7 +162,12 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
 
 # ── Main ─────────────────────────────────────────────────────────────
 def main():
-    df = fetch_live_props()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--refresh", action="store_true",
+                        help="force new Odds API fetch")
+    args = parser.parse_args()
+
+    df = fetch_live_props(refresh=args.refresh)
     df = add_features(df)
 
     df["μ"]    = MODEL.predict(df[FEATS])

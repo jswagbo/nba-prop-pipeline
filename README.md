@@ -28,6 +28,8 @@
 
 Execute:
 ```bash
-python refresh.py
+python refresh.py [--refresh]
 ```
-The script prints a table of the top edges and a JSON block with the same data.
+Results are cached in `cache/live_props.json` keyed by date. Use `--refresh` to
+ignore the cache and fetch new odds. The script prints a table of the top edges
+and a JSON block with the same data.
