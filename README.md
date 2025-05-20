@@ -1,6 +1,8 @@
 # NBA Prop Pipeline
 
 `refresh.py` fetches NBA player prop odds from the Odds API and scores them with a trained regression model.
+It now collects rebound and assist markets in addition to points, though predictions
+are still generated for points only.
 
 ## Setup
 
