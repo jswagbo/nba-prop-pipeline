@@ -30,4 +30,17 @@ Execute:
 ```bash
 python refresh.py
 ```
-The script prints a table of the top edges and a JSON block with the same data.
+The script logs a table of the top edges and a JSON block with the same data.
+
+### Log levels
+
+Adjust the verbosity with the `LOG_LEVEL` environment variable or the
+`--log-level` command line option. Valid levels are the standard Python logging
+levels such as `DEBUG`, `INFO` and `WARNING`.
+
+Examples:
+
+```bash
+LOG_LEVEL=DEBUG python refresh.py          # via environment variable
+python refresh.py --log-level WARNING      # via CLI option
+```

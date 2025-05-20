@@ -8,6 +8,9 @@ Output:   Top 10 player-points edges (table + JSON)
 
 import os, joblib, requests, pandas as pd
 import re
+import logging
+import argparse
+import sys
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
@@ -148,17 +151,27 @@ def main():
     top = df.sort_values("edge", ascending=False).head(10)
 
     # markdown
-    print(top[["player","game","prop","μ","edge","conf"]]
-          .to_markdown(index=False, floatfmt=".1f"))
+    logging.info("\n%s",
+                 top[["player","game","prop","μ","edge","conf"]]
+                 .to_markdown(index=False, floatfmt=".1f"))
 
     # JSON
-    print("\n```json")
-    print(top.to_json(orient="records", indent=2))
-    print("```")
+    logging.info("\n```json\n%s\n```",
+                 top.to_json(orient="records", indent=2))
 
     ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    print(f"\nData refreshed: {ts} UTC")
-    print("\nPredictions are for informational purposes only. Bet responsibly.")
+    logging.info("\nData refreshed: %s UTC", ts)
+    logging.info("\nPredictions are for informational purposes only. Bet responsibly.")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--log-level",
+                        default=os.getenv("LOG_LEVEL", "INFO"),
+                        help="Logging level (DEBUG, INFO, WARNING, ERROR)")
+    args = parser.parse_args()
+
+    logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.INFO),
+                        format="%(levelname)s: %(message)s",
+                        stream=sys.stdout)
+
     main()
