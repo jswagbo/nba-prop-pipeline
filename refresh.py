@@ -3,7 +3,7 @@
 Run:      python refresh.py
 Requires: ODDS_API_KEY in .env
           models/player_points.joblib   (trained earlier)
-Output:   Top 10 player-points edges (table + JSON)
+Output:   Top 20 player-points edges (table + JSON)
 """
 
 import os, joblib, requests, pandas as pd
@@ -171,7 +171,7 @@ def main():
 
     points = points.drop_duplicates(subset=["player", "line", "game"])
 
-    top = points.sort_values("edge", ascending=False).head(10)
+    top = points.sort_values("edge", ascending=False).head(20)
 
     # markdown
     logging.info("\n%s",
