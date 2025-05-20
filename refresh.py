@@ -59,8 +59,8 @@ def today_events():
     r.raise_for_status()
     return r.json()
 
-def player_points(event_id, game_label):
-    """Return player point props for a game.
+def player_props(event_id: str, game_label: str, market: str) -> list[dict]:
+    """Return player prop lines for a specific market.
 
     Parameters
     ----------
@@ -68,42 +68,63 @@ def player_points(event_id, game_label):
         Odds API event identifier.
     game_label: str
         Human readable game label.
+    market: str
+        Market key such as ``"player_points"`` or ``"player_rebounds"``.
 
     Returns
     -------
     list[dict]
-        Each entry has ``player``, ``line``, ``price`` and ``game`` keys.
+        Each entry has ``player``, ``line``, ``price``, ``game`` and ``market``
+        keys.
     """
     r = requests.get(f"{BASE}/events/{event_id}/odds",
                      params={"apiKey": ODDS_KEY,
                              "regions": "us",
-                             "markets": "player_points"},
+                             "markets": market},
                      timeout=20)
     r.raise_for_status()
     rows = []
     data = r.json()
     for bk in data.get("bookmakers", []):
-        m = next((m for m in bk["markets"] if m["key"] == "player_points"), None)
+        m = next((m for m in bk["markets"] if m["key"] == market), None)
         if not m:
             continue
-        for o in m["outcomes"]:
+        for o in m.get("outcomes", []):
             rows.append({
                 "player": o["description"],
                 "line":   o["point"],
                 "price":  o["price"],
-                "game":   game_label
+                "game":   game_label,
+                "market": market,
             })
         break
     return rows
 
-def fetch_live_props():
-    """Collect player point props for all of today's games as a DataFrame."""
-    props = []
+
+def player_points(event_id: str, game_label: str) -> list[dict]:
+    """Wrapper for ``player_props`` using the ``player_points`` market."""
+    return player_props(event_id, game_label, "player_points")
+
+
+def player_rebounds(event_id: str, game_label: str) -> list[dict]:
+    """Wrapper for ``player_props`` using the ``player_rebounds`` market."""
+    return player_props(event_id, game_label, "player_rebounds")
+
+
+def player_assists(event_id: str, game_label: str) -> list[dict]:
+    """Wrapper for ``player_props`` using the ``player_assists`` market."""
+    return player_props(event_id, game_label, "player_assists")
+
+def fetch_live_props() -> pd.DataFrame:
+    """Collect player prop markets for today's games as a DataFrame."""
+    props: list[dict] = []
     for g in today_events():
         label = f'{g["away_team"]} @ {g["home_team"]}'
         props += player_points(g["id"], label)
+        props += player_rebounds(g["id"], label)
+        props += player_assists(g["id"], label)
     if not props:
-        raise SystemExit("No player-points markets for today.")
+        raise SystemExit("No player prop markets for today.")
     return pd.DataFrame(props)
 
 # ── Build live feature frame ─────────────────────────────────────────
@@ -141,14 +162,16 @@ def main():
     df = fetch_live_props()
     df = add_features(df)
 
-    df["μ"]    = MODEL.predict(df[FEATS])
-    df["edge"] = df["μ"] - df["line"]
-    df["conf"] = (df["edge"].abs() * 10 + 50).clip(0, 100).round().astype(int)
-    df["prop"] = "PTS O " + df["line"].astype(str)
+    points = df[df["market"] == "player_points"].copy()
 
-    df = df.drop_duplicates(subset=["player", "line", "game"])
+    points["μ"]    = MODEL.predict(points[FEATS])
+    points["edge"] = points["μ"] - points["line"]
+    points["conf"] = (points["edge"].abs() * 10 + 50).clip(0, 100).round().astype(int)
+    points["prop"] = "PTS O " + points["line"].astype(str)
 
-    top = df.sort_values("edge", ascending=False).head(10)
+    points = points.drop_duplicates(subset=["player", "line", "game"])
+
+    top = points.sort_values("edge", ascending=False).head(10)
 
     # markdown
     logging.info("\n%s",
