@@ -6,8 +6,10 @@ Requires: ODDS_API_KEY in .env
 Output:   Top 10 player-points edges (table + JSON)
 """
 
-import os, json, joblib, requests, pandas as pd
+import os, joblib, requests, pandas as pd
 import re
+from datetime import datetime, timezone
+from dotenv import load_dotenv
 TRAIN_LOGS = pd.read_parquet("data/player_logs.parquet")
 LAST5      = pd.read_parquet("cache/last5.parquet")
 
@@ -21,9 +23,6 @@ def clean_name(name: str) -> str:
     name = re.sub(r"\([^)]*\)", "", name)            # strip "(…)"
     name = re.sub(r"[^A-Za-z\s]", "", name)          # keep letters & spaces
     return name.lower().strip()
-from datetime import datetime, timezone
-from dotenv import load_dotenv
-
 # ── Load secrets & model ──────────────────────────────────────────────
 load_dotenv()
 ODDS_KEY = os.getenv("ODDS_API_KEY")
