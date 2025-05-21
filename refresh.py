@@ -40,9 +40,17 @@ ODDS_KEY = os.getenv("ODDS_API_KEY")
 if not ODDS_KEY:
     raise SystemExit("❌  ODDS_API_KEY missing; add it to .env")
 
-MODEL_BUNDLE = joblib.load("models/player_points.joblib")
-MODEL        = MODEL_BUNDLE["model"]
-FEATS        = MODEL_BUNDLE["features"]      # ['season_pts','rolling5','home']
+# Load models for points, rebounds, and assists
+try:
+    POINTS_MODEL_BUNDLE = joblib.load("models/player_points.joblib")
+    REBOUNDS_MODEL_BUNDLE = joblib.load("models/player_rebounds.joblib")
+    ASSISTS_MODEL_BUNDLE = joblib.load("models/player_assists.joblib")
+except FileNotFoundError as e:
+    raise SystemExit("❌  One or more model files are missing in the models/ directory.") from e
+
+POINTS_MODEL, POINTS_FEATS = POINTS_MODEL_BUNDLE["model"], POINTS_MODEL_BUNDLE["features"]
+REBOUNDS_MODEL, REBOUNDS_FEATS = REBOUNDS_MODEL_BUNDLE["model"], REBOUNDS_MODEL_BUNDLE["features"]
+ASSISTS_MODEL, ASSISTS_FEATS = ASSISTS_MODEL_BUNDLE["model"], ASSISTS_MODEL_BUNDLE["features"]
 
 # season-average points per player (static lookup from training data)
 TRAIN_LOGS = pd.read_parquet("data/player_logs.parquet")
@@ -162,24 +170,32 @@ def main():
     df = fetch_live_props()
     df = add_features(df)
 
-    points = df[df["market"] == "player_points"].copy()
+    all_predictions = []
 
-    points["μ"]    = MODEL.predict(points[FEATS])
-    points["edge"] = points["μ"] - points["line"]
-    points["conf"] = (points["edge"].abs() * 10 + 50).clip(0, 100).round().astype(int)
-    points["prop"] = "PTS O " + points["line"].astype(str)
+    # Generate predictions for each market
+    for market, model, feats in [
+        ("player_points", POINTS_MODEL, POINTS_FEATS),
+        ("player_rebounds", REBOUNDS_MODEL, REBOUNDS_FEATS),
+        ("player_assists", ASSISTS_MODEL, ASSISTS_FEATS),
+    ]:
+        market_df = df[df["market"] == market].copy()
 
-    points = points.drop_duplicates(subset=["player", "line", "game"])
+        if not market_df.empty:
+            market_df["μ"] = model.predict(market_df[feats])
+            market_df["edge"] = market_df["μ"] - market_df["line"]
+            market_df["conf"] = (market_df["edge"].abs() * 10 + 50).clip(0, 100).round().astype(int)
+            market_df["prop"] = f"{market.split('_')[1].upper()} O " + market_df["line"].astype(str)
 
-    top = points.sort_values("edge", ascending=False).head(20)
+            all_predictions.append(market_df)
+
+    if not all_predictions:
+        logging.info("No predictions generated for any market.")
+        return
+
+    all_predictions_df = pd.concat(all_predictions, ignore_index=True)
+    top = all_predictions_df.sort_values("edge", ascending=False).head(20)
 
     # markdown
-    logging.info("\n%s",
-                 top[["player","game","prop","μ","edge","conf"]]
-                 .to_markdown(index=False, floatfmt=".1f"))
-
-    # JSON
-    logging.info("\n```json\n%s\n```",
                  top.to_json(orient="records", indent=2))
 
     ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
