@@ -195,7 +195,9 @@ def main():
     all_predictions_df = pd.concat(all_predictions, ignore_index=True)
     top = all_predictions_df.sort_values("edge", ascending=False).head(20)
 
-    # markdown
+    # show results in a simple table and JSON block
+    logging.info("\n%s\n%s",
+                 top.to_markdown(index=False, floatfmt=".1f"),
                  top.to_json(orient="records", indent=2))
 
     ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
